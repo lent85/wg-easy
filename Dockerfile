@@ -1,40 +1,51 @@
-# --------------> The production image
-FROM node:20.11.1-alpine3.19
+# Build stage for node modules
+FROM node:20-alpine AS build_node_modules
 
-# Set working directory
+# Copy package files first for better caching
 WORKDIR /app
-
-# Set node environment to production
-ENV NODE_ENV=production
-
-# Add package files first (better caching)
 COPY package*.json ./
+RUN npm ci --production
 
-# Install production dependencies
-RUN npm ci --only=production && \
-    npm cache clean --force
+# Copy source files
+COPY src/ ./src/
 
-# Copy application files
-COPY . .
+# Production stage
+FROM node:20-alpine
 
-# Add custom packages if needed
-RUN apk add --no-cache \
-    tini \
-    && rm -rf /var/cache/apk/*
+# Copy built application from build stage
+COPY --from=build_node_modules /app /app
 
-# Use tini as init system
-ENTRYPOINT ["/sbin/tini", "--"]
+# Move node_modules up one level for development efficiency
+# This helps with faster reloading and architecture compatibility
+RUN mv /app/node_modules /node_modules
 
-# Create and use non-root user for security
+# Install required system packages
+RUN apk add -U --no-cache \
+    iptables \
+    wireguard-tools \
+    tini
+
+# Create and use non-root user for better security
 RUN addgroup -g 1001 nodejs && \
     adduser -S -u 1001 -G nodejs nodejs && \
     chown -R nodejs:nodejs /app
 
-USER nodejs
-
-# Expose port (customize as needed)
+# Expose WireGuard and Web UI ports
 EXPOSE 51820/udp
 EXPOSE 51821/tcp
+
+# Set debug environment for logging
+ENV DEBUG=Server,WireGuard
+ENV NODE_ENV=production
+
+# Switch to non-root user
+USER nodejs
+
+# Set working directory
+WORKDIR /app
+
+# Use tini as init system
+ENTRYPOINT ["/sbin/tini", "--"]
 
 # Start the application
 CMD ["node", "server.js"]
