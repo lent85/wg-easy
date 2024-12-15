@@ -1,51 +1,37 @@
-# Build stage for node modules
-FROM node:20-alpine AS build_node_modules
+FROM docker.io/library/node:20-alpine AS build_node_modules
 
-# Copy package files first for better caching
+# Copy Web UI
+COPY src/ /app/
 WORKDIR /app
-COPY package*.json ./
 RUN npm ci --production
 
-# Copy the entire app directory
-COPY . .
-
-# Production stage
-FROM node:20-alpine
-
-# Copy built application from build stage
+# Copy build result to a new image.
+# This saves a lot of disk space.
+FROM docker.io/library/node:20-alpine
 COPY --from=build_node_modules /app /app
 
-# Move node_modules up one level for development efficiency
-# This helps with faster reloading and architecture compatibility
+# Move node_modules one directory up, so during development
+# we don't have to mount it in a volume.
+# This results in much faster reloading!
+#
+# Also, some node_modules might be native, and
+# the architecture & OS of your development machine might differ
+# than what runs inside of docker.
 RUN mv /app/node_modules /node_modules
 
-# Install required system packages
+# Install Linux packages
 RUN apk add -U --no-cache \
-    iptables \
-    wireguard-tools \
-    tini
+  iptables \
+  wireguard-tools \
+  dumb-init
 
-# Create and use non-root user for better security
-RUN addgroup -g 1001 nodejs && \
-    adduser -S -u 1001 -G nodejs nodejs && \
-    chown -R nodejs:nodejs /app /node_modules
-
-# Expose WireGuard and Web UI ports
+# Expose Ports
 EXPOSE 51820/udp
 EXPOSE 51821/tcp
 
-# Set debug environment for logging
+# Set Environment
 ENV DEBUG=Server,WireGuard
-ENV NODE_ENV=production
 
-# Switch to non-root user
-USER nodejs
-
-# Set working directory
+# Run Web UI
 WORKDIR /app
-
-# Use tini as init system
-ENTRYPOINT ["/sbin/tini", "--"]
-
-# Start the application
-CMD ["node", "server.js"]
+CMD ["/usr/bin/dumb-init", "node", "server.js"]
