@@ -6,8 +6,8 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci --production
 
-# Copy source files
-COPY src/ ./src/
+# Copy the entire app directory
+COPY . .
 
 # Production stage
 FROM node:20-alpine
@@ -28,7 +28,7 @@ RUN apk add -U --no-cache \
 # Create and use non-root user for better security
 RUN addgroup -g 1001 nodejs && \
     adduser -S -u 1001 -G nodejs nodejs && \
-    chown -R nodejs:nodejs /app
+    chown -R nodejs:nodejs /app /node_modules
 
 # Expose WireGuard and Web UI ports
 EXPOSE 51820/udp
