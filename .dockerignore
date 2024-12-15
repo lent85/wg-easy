@@ -1,0 +1,32 @@
+# Version control
+.git
+.gitignore
+.gitattributes
+
+# Development
+node_modules
+src/node_modules
+npm-debug.log
+Dockerfile
+.dockerignore
+.env
+.env.*
+*.md
+.eslintrc
+.prettierrc
+.vscode
+coverage
+test
+tests
+jest.config.js
+
+# Build
+dist
+build
+.next
+.nuxt
+.cache
+
+# OS
+.DS_Store
+*.log
